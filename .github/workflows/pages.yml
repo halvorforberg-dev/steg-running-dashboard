@@ -1,0 +1,44 @@
+name: Update Garmin data and publish STEG
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "17 * * * *"
+  push:
+    branches: ["main"]
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+concurrency:
+  group: pages
+  cancel-in-progress: false
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install -r requirements.txt
+      - name: Fetch Garmin activities
+        env:
+          GARMIN_HALVOR: ${{ secrets.GARMIN_HALVOR }}
+          GARMIN_TORE: ${{ secrets.GARMIN_TORE }}
+          GARMIN_KJETIL: ${{ secrets.GARMIN_KJETIL }}
+        run: python fetch_garmin.py
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v4
+        with:
+          path: site
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy
+        id: deployment
+        uses: actions/deploy-pages@v4
