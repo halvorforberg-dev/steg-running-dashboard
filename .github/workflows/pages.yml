@@ -1,44 +1,38 @@
-name: Update Garmin data and publish STEG
+name: Publish STEG
 on:
   workflow_dispatch:
   schedule:
     - cron: "17 * * * *"
   push:
-    branches: ["main"]
+    branches: [main]
 permissions:
-  contents: read
+  contents: write
   pages: write
   id-token: write
-concurrency:
-  group: pages
-  cancel-in-progress: false
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-          cache: pip
+        with: {python-version: "3.12"}
       - run: pip install -r requirements.txt
-      - name: Fetch Garmin activities
+      - name: Fetch Garmin
         env:
           GARMIN_HALVOR: ${{ secrets.GARMIN_HALVOR }}
           GARMIN_TORE: ${{ secrets.GARMIN_TORE }}
           GARMIN_KJETIL: ${{ secrets.GARMIN_KJETIL }}
-        run: python fetch_garmin.py
+        run: python fetch_online.py
+      - run: git config user.name steg-bot && git config user.email steg-bot@users.noreply.github.com && git add data.json && (git diff --cached --quiet || git commit -m "Update Garmin data") && git push
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v4
-        with:
-          path: site
+        with: {path: .}
   deploy:
+    needs: build
+    runs-on: ubuntu-latest
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
-    needs: build
-    runs-on: ubuntu-latest
     steps:
-      - name: Deploy
-        id: deployment
+      - id: deployment
         uses: actions/deploy-pages@v4
