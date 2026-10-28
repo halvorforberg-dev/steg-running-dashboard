@@ -1,7 +1,0 @@
-﻿.private/
-.venv/
-*.key
-*token*.json
-STEG-master-backup-*
-_backup_*/
-
