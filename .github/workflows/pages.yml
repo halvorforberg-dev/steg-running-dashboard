@@ -9,13 +9,20 @@ permissions:
   contents: write
   pages: write
   id-token: write
+concurrency:
+  group: steg-pages-main
+  cancel-in-progress: false
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
       - uses: actions/setup-python@v5
-        with: {python-version: "3.12"}
+        with:
+          python-version: "3.12"
       - run: pip install -r requirements.txt
       - name: Fetch Garmin
         env:
@@ -23,10 +30,38 @@ jobs:
           GARMIN_TORE: ${{ secrets.GARMIN_TORE }}
           GARMIN_KJETIL: ${{ secrets.GARMIN_KJETIL }}
         run: python fetch_online.py
-      - run: git config user.name steg-bot && git config user.email steg-bot@users.noreply.github.com && git add data.json && (git diff --cached --quiet || git commit -m "Update Garmin data") && git push
+      - name: Persist Garmin data without overwriting newer site changes
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp data.json "$RUNNER_TEMP/data.json"
+          git config user.name "steg-bot"
+          git config user.email "steg-bot@users.noreply.github.com"
+          git fetch origin main
+          git reset --hard origin/main
+          cp "$RUNNER_TEMP/data.json" data.json
+          git add data.json
+          if git diff --cached --quiet; then
+            echo "No Garmin data changes to commit."
+          else
+            git commit -m "Update Garmin data"
+            for attempt in 1 2 3; do
+              git fetch origin main
+              if git rebase origin/main && git push origin HEAD:main; then
+                exit 0
+              fi
+              git rebase --abort || true
+              if [ "$attempt" -eq 3 ]; then
+                echo "Could not persist data.json after 3 attempts." >&2
+                exit 1
+              fi
+              sleep $((attempt * 2))
+            done
+          fi
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v4
-        with: {path: .}
+        with:
+          path: .
   deploy:
     needs: build
     runs-on: ubuntu-latest
@@ -34,5 +69,6 @@ jobs:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
-      - id: deployment
+      - name: Deploy
+        id: deployment
         uses: actions/deploy-pages@v4
