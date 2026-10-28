@@ -1,74 +1,95 @@
-name: Publish STEG stable
+﻿name: Publish STEG stable
+
 on:
   workflow_dispatch:
   schedule:
     - cron: "17 * * * *"
   push:
-    branches: [main]
+    branches:
+      - main
     paths:
-      - "index.html"
-      - "fetch_online.py"
-      - "garmin_records.py"
-      - "requirements.txt"
-      - ".github/workflows/pages.yml"
+      - index.html
+      - fetch_online.py
+      - garmin_records.py
+      - requirements.txt
+      - .github/workflows/pages.yml
+
 permissions:
   contents: read
   pages: write
   id-token: write
+
 concurrency:
-  group: steg-pages-production
+  group: steg-production
   cancel-in-progress: false
+
 jobs:
+
   build:
+
     runs-on: ubuntu-latest
+
     steps:
-      - name: Check out STEG
+
+      - name: Checkout
         uses: actions/checkout@v4
-      - name: Set up Python
+
+      - name: Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - name: Install Garmin client
+
+      - name: Install
         run: pip install -r requirements.txt
-      - name: Fetch Garmin data
+
+      - name: Garmin
         env:
           GARMIN_HALVOR: ${{ secrets.GARMIN_HALVOR }}
           GARMIN_TORE: ${{ secrets.GARMIN_TORE }}
           GARMIN_KJETIL: ${{ secrets.GARMIN_KJETIL }}
         run: python fetch_online.py
-      - name: Build clean Pages artifact
-        shell: bash
+
+      - name: Validate
         run: |
-          set -euo pipefail
-          test -s index.html
-          test -s data.json
           python - <<'PY'
           import json
           from pathlib import Path
-          data=json.loads(Path('data.json').read_text(encoding='utf-8'))
-          assert isinstance(data.get('activities'), list) and data['activities'], 'activities missing'
-          assert isinstance(data.get('sync'), dict), 'sync missing'
-          print('Activities:', len(data['activities']))
-          print('Records:', len(data.get('records', [])))
+
+          data=json.loads(
+              Path("data.json").read_text(encoding="utf-8")
+          )
+
+          assert data.get("activities")
+          assert data.get("sync")
+
+          print("Activities:",len(data["activities"]))
+          print("Records:",len(data.get("records",[])))
           PY
-          rm -rf public
+
+      - name: Build
+        run: |
           mkdir public
           cp index.html public/index.html
           cp data.json public/data.json
           touch public/.nojekyll
-      - name: Configure GitHub Pages
-        uses: actions/configure-pages@v5
-      - name: Upload clean Pages artifact
-        uses: actions/upload-pages-artifact@v4
+
+      - uses: actions/configure-pages@v5
+
+      - uses: actions/upload-pages-artifact@v4
         with:
           path: public
+
   deploy:
+
     needs: build
     runs-on: ubuntu-latest
+
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
+
     steps:
-      - name: Deploy STEG
+
+      - name: Deploy
         id: deployment
         uses: actions/deploy-pages@v4

@@ -1,0 +1,6 @@
+﻿.private/
+.venv/
+*.key
+*token*.json
+_backup_*/
+_SAFE_BACKUP_*/

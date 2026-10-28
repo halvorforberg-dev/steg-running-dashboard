@@ -70,6 +70,210 @@ document.addEventListener('change',e=>{if(e.target.matches('#recordPerson,#recor
 })();
 </script>
 
+
+<style id="steg-final-records-style">
+.steg-final-records{
+    display:grid;
+    grid-template-columns:repeat(2,minmax(0,1fr));
+    gap:12px;
+}
+.steg-record-source{
+    color:var(--muted);
+    font-size:10px;
+    margin-top:6px;
+}
+@media(max-width:650px){
+    .steg-final-records{grid-template-columns:1fr}
+}
+</style>
+
+<script id="steg-final-records-script">
+(function(){
+"use strict";
+
+const specs = [
+    { d:1, label:"1 km", tol:0.08 },
+    { d:5, label:"5 km", tol:0.20 },
+    { d:10, label:"10 km", tol:0.35 },
+    { d:21.0975, label:"Halvmaraton", tol:0.50 }
+];
+
+function safe(v){
+    return String(v ?? "").replace(/[&<>"']/g, function(c){
+        return {
+            "&":"&amp;",
+            "<":"&lt;",
+            ">":"&gt;",
+            '"':"&quot;",
+            "'":"&#39;"
+        }[c];
+    });
+}
+
+function formatTime(seconds){
+    seconds = Math.round(Number(seconds));
+
+    const h = Math.floor(seconds / 3600);
+    seconds %= 3600;
+
+    const m = Math.floor(seconds / 60);
+    const s = seconds % 60;
+
+    return h
+        ? h + ":" + String(m).padStart(2,"0") + ":" + String(s).padStart(2,"0")
+        : m + ":" + String(s).padStart(2,"0");
+}
+
+function findRecord(person, spec){
+
+    const stored = Array.isArray(state.records) ? state.records : [];
+
+    const fromRecords = stored
+        .filter(function(r){
+            return Math.abs(Number(r.distanceKm) - spec.d) < 0.001 &&
+                (person === "Alle" || r.person === person);
+        })
+        .sort(function(a,b){
+            return Number(a.seconds) - Number(b.seconds);
+        })[0];
+
+    if(fromRecords){
+        return {
+            person: fromRecords.person,
+            seconds: Number(fromRecords.seconds),
+            date: fromRecords.date,
+            source: fromRecords.source === "garmin_split"
+                ? "Garmin-splitt"
+                : "Komplett Garmin-aktivitet"
+        };
+    }
+
+    const activities =
+        Array.isArray(state.activities) ? state.activities : [];
+
+    const activity = activities
+        .filter(function(a){
+            return (person === "Alle" || a.person === person) &&
+                Math.abs(Number(a.km) - spec.d) <= spec.tol &&
+                Number(a.minutes) > 0;
+        })
+        .sort(function(a,b){
+            return Number(a.minutes) - Number(b.minutes);
+        })[0];
+
+    if(!activity){
+        return null;
+    }
+
+    return {
+        person: activity.person,
+        seconds: Number(activity.minutes) * 60,
+        date: activity.date,
+        source: "Komplett Garmin-aktivitet"
+    };
+}
+
+function recordCard(record, spec, showPerson){
+
+    if(!record){
+        return `
+        <div class="record">
+            <div class="eyebrow">${spec.label}</div>
+            <b>Ingen kvalifiserende Garmin-aktivitet</b>
+        </div>`;
+    }
+
+    return `
+    <div class="record">
+        <div class="eyebrow">${spec.label}</div>
+        <div class="value">${formatTime(record.seconds)}</div>
+        ${showPerson ? `<div class="winner">${safe(record.person)}</div>` : ""}
+        <div class="muted">${safe(record.date || "")}</div>
+        <div class="steg-record-source">${safe(record.source)}</div>
+    </div>`;
+}
+
+function renderRecordArea(element, person){
+
+    if(!element){
+        return;
+    }
+
+    element.innerHTML =
+        `<div class="steg-final-records">` +
+        specs.map(function(spec){
+            return recordCard(
+                findRecord(person, spec),
+                spec,
+                person === "Alle"
+            );
+        }).join("") +
+        `</div>`;
+}
+
+function renderEverything(){
+
+    if(typeof state === "undefined"){
+        return;
+    }
+
+    const sidePerson =
+        document.getElementById("recordPerson")?.value || "Alle";
+
+    const mainPerson =
+        document.getElementById("recordPersonMain")?.value || "Alle";
+
+    renderRecordArea(
+        document.getElementById("sideRecords"),
+        sidePerson
+    );
+
+    renderRecordArea(
+        document.getElementById("recordGrid"),
+        mainPerson
+    );
+
+    const selected =
+        document.querySelector("#profileTabs .tab.active")?.dataset.person ||
+        "Alle";
+
+    const five = findRecord(selected, specs[1]);
+
+    const highlight =
+        document.querySelector("#highlights .card:nth-child(3)");
+
+    if(five && highlight){
+
+        highlight.innerHTML = `
+            <div class="eyebrow">Raskeste 5 km</div>
+            <div class="value">${formatTime(five.seconds)}</div>
+            ${selected === "Alle"
+                ? `<div class="winner">${safe(five.person)}</div>`
+                : ""}
+            <div class="muted">
+                ${safe(five.source)} · ${safe(five.date || "")}
+            </div>
+        `;
+    }
+}
+
+document.addEventListener("change", function(e){
+    if(e.target.matches("#recordPerson,#recordPersonMain")){
+        setTimeout(renderEverything, 0);
+    }
+});
+
+document.addEventListener("click", function(e){
+    if(e.target.closest("[data-person]")){
+        setTimeout(renderEverything, 100);
+    }
+});
+
+setInterval(renderEverything, 1200);
+
+})();
+</script>
+
 </body></html>
 
 
