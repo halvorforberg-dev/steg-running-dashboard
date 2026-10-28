@@ -208,4 +208,29 @@ function renderLastAll(){const host=document.getElementById('latest');if(!host||
 let timer;function refresh(){clearTimeout(timer);timer=setTimeout(renderLastAll,180)}
 renderLastAll();document.addEventListener('click',e=>{if(e.target.closest('#profiles button[data-person]'))refresh()});setInterval(renderLastAll,60000);
 })();
+</script>\n<style id="steg-menu-records-v8">
+#records .steg-pr-controls{display:flex;gap:10px;align-items:end;flex-wrap:wrap;margin:16px 0}
+#records .steg-pr-controls label{min-width:220px}#records .steg-pr-controls select{width:100%}
+#records .steg-pr-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+#records .steg-pr-card{border:1px solid var(--line);border-radius:14px;padding:17px;background:#15261f}
+#records .steg-pr-distance{color:var(--muted);font-size:11px;letter-spacing:1.5px;text-transform:uppercase}
+#records .steg-pr-time{font-size:25px;font-weight:800;margin:9px 0}.steg-pr-name{color:var(--lime);font-weight:800}
+#records .steg-pr-note{margin-top:18px;padding:14px;border:1px solid #52603a;border-radius:12px;color:var(--muted);font-size:12px;line-height:1.6}
+@media(max-width:650px){#records .steg-pr-grid{grid-template-columns:1fr}}
+</style>
+<script>
+(()=>{'use strict';
+const runnerNames=['Alle','Halvor','Tore','Kjetil'];
+const targets=[['1 km',1,.08],['5 km',5,.2],['10 km',10,.35],['Halvmaraton',21.0975,.5],['Maraton',42.195,.8]];
+function esc(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+function num(v){return Number(v).toLocaleString('nb-NO',{maximumFractionDigits:2})}
+function timeFromMinutes(minutes){let sec=Math.round(Number(minutes)*60),h=Math.floor(sec/3600);sec%=3600;let m=Math.floor(sec/60),s=sec%60;return h?`${h}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`:`${m}:${String(s).padStart(2,'0')}`}
+function dateNo(s){return new Date(s+'T12:00:00').toLocaleDateString('nb-NO',{day:'2-digit',month:'2-digit',year:'numeric'})}
+function showView(id){document.querySelectorAll('.view').forEach(v=>{v.hidden=v.id!==id});document.querySelectorAll('[data-view]').forEach(b=>b.classList.toggle('active',b.dataset.view===id));if(id==='records')renderRecords();window.scrollTo({top:0,behavior:'smooth'})}
+function installMenu(){document.querySelectorAll('[data-view]').forEach(button=>{button.addEventListener('click',e=>{e.preventDefault();e.stopImmediatePropagation();showView(button.dataset.view)},true)})}
+function selectedRecordRunner(){return document.getElementById('steg-pr-person')?.value||'Alle'}
+function renderRecords(){const section=document.getElementById('records');if(!section||typeof state==='undefined'||!Array.isArray(state.activities))return;let shell=document.getElementById('steg-pr-shell');if(!shell){section.innerHTML='<article class="card"><div class="sectionhead"><div><h2>Personlige rekorder fra Garmin-aktiviteter</h2><div class="muted">Automatisk beregnet fra synkroniserte, komplette løpeaktiviteter</div></div></div><div id="steg-pr-shell"></div></article>';shell=document.getElementById('steg-pr-shell')}const previous=selectedRecordRunner();shell.innerHTML='<div class="steg-pr-controls"><label>Velg løper<select id="steg-pr-person">'+runnerNames.map(n=>`<option${n===previous?' selected':''}>${n}</option>`).join('')+'</select></label></div><div id="steg-pr-grid" class="steg-pr-grid"></div><div class="steg-pr-note">Kilde: synkroniserte Garmin-aktiviteter. Rekorden beregnes bare fra en komplett aktivitet innen toleransen for distansen. Et raskt 5 km-segment inne i en lengre tur kan ikke identifiseres uten splitdata. Dette er derfor ikke Garmins offisielle rekordliste.</div>';document.getElementById('steg-pr-person').addEventListener('change',renderRecordCards);renderRecordCards()}
+function renderRecordCards(){const host=document.getElementById('steg-pr-grid');if(!host||typeof state==='undefined')return;const who=selectedRecordRunner(),all=state.activities.filter(a=>a&&a.person&&Number(a.km)>0&&Number(a.minutes)>0&&(who==='Alle'||a.person===who));host.innerHTML=targets.map(([label,d,tol])=>{const list=all.filter(a=>Math.abs(Number(a.km)-d)<=tol).sort((a,b)=>Number(a.minutes)-Number(b.minutes)),a=list[0];if(!a)return `<div class="steg-pr-card"><div class="steg-pr-distance">${label}</div><div class="steg-pr-time">Ingen treff</div><div class="muted">Ingen komplett aktivitet nær distansen.</div></div>`;return `<div class="steg-pr-card"><div class="steg-pr-distance">${label}</div><div class="steg-pr-time">${timeFromMinutes(a.minutes)}</div><div class="steg-pr-name">${esc(a.person)}</div><div class="muted">${num(a.km)} km · ${dateNo(a.date)}<br>${esc(a.title||'Løpeøkt')}</div></div>`}).join('')}
+installMenu();const add=document.getElementById('addrecord');if(add)add.remove();renderRecords();setInterval(()=>{if(!document.getElementById('records')?.hidden)renderRecordCards()},60000);
+})();
 </script>\n</body></html>
